@@ -39,6 +39,15 @@
     try { return acode.require("settings").value[PLUGIN_ID] || {}; } catch (e) { return {}; }
   }
 
+  // Safe HTML insertion: parse with DOMParser (never runs scripts) and copy the nodes in.
+  function setHtml(el, html) {
+    var doc = new DOMParser().parseFromString(String(html), "text/html");
+    while (el.firstChild) el.removeChild(el.firstChild);
+    Array.prototype.slice.call(doc.body.childNodes).forEach(function (n) {
+      el.appendChild(document.importNode(n, true));
+    });
+  }
+
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
@@ -78,8 +87,20 @@
     if (type === "google" && !apiKey) throw new Error("Enter your Google AI API key.");
     if (type === "url") {
       if (!apiUrl) throw new Error("Enter your AI API URL.");
-      try { var parsedUrl = new URL(apiUrl); if (parsedUrl.protocol !== "https:" && parsedUrl.protocol !== "http:") throw new Error(); }
-      catch (e) { throw new Error("Enter a valid HTTP or HTTPS AI API URL."); }
+      var parsedUrl;
+      try { parsedUrl = new URL(apiUrl); if (parsedUrl.protocol !== "https:") throw new Error(); }
+      catch (e) { throw new Error("Enter a valid HTTPS AI API URL (https://...)."); }
+      if (!old || old.apiUrl !== apiUrl) {
+        // Ask before forwarding user messages to a third-party address.
+        var okSend = true;
+        try {
+          var ask = acode.require("confirm");
+          if (typeof ask === "function") {
+            okSend = await ask("Send messages to " + parsedUrl.host + "?", "Every message sent to this bot will be forwarded to " + parsedUrl.host + ". Only continue if you trust it.");
+          }
+        } catch (e) { okSend = true; }
+        if (!okSend) throw new Error("Cancelled. The AI API URL was not saved.");
+      }
     }
     var me = await api(token, "getMe");
     var cmds = [];
@@ -273,7 +294,7 @@
         esc(b.name) + "</b><br><small>@" + esc(b.username) + " · " + provider + " · " +
         (on ? "running" : "stopped") + "</small></div>";
     });
-    app.innerHTML = h + "</div>";
+    setHtml(app, h + "</div>");
     var add = app.querySelector("#add");
     if (add) add.onclick = function () { view = { name: "add" }; render(); };
     [].forEach.call(app.querySelectorAll(".tgb-card"), function (el) {
@@ -282,19 +303,19 @@
   }
 
   function renderAdd() {
-    app.innerHTML = '<div class="tgb-bar"><button class="ghost" id="back">‹</button><b>Add bot</b></div>' +
+    setHtml(app, '<div class="tgb-bar"><button class="ghost" id="back">‹</button><b>Add bot</b></div>' +
       '<div class="tgb-pad"><label>Bot type<select id="type"><option value="commands">Telegram commands / replies</option><option value="google">Google AI (Gemini)</option><option value="url">AI API URL</option></select></label>' +
       '<p><small>All bot types need a Telegram bot token from @BotFather.</small></p>' +
       '<input id="tok" placeholder="Telegram bot token" autocomplete="off">' +
       '<div id="provider-fields"></div><div class="tgb-err" id="err"></div>' +
-      '<button id="go">Log in</button></div>';
+      '<button id="go">Log in</button></div>');
     app.querySelector("#back").onclick = function () { view = { name: "list" }; render(); };
     var providerFields = app.querySelector("#provider-fields");
     function updateProviderFields() {
       var type = app.querySelector("#type").value;
-      if (type === "google") providerFields.innerHTML = '<input id="apikey" type="password" placeholder="Google AI API key" autocomplete="off"><small>Uses Google Gemini 2.5 Flash. The key is stored locally with this bot.</small>';
-      else if (type === "url") providerFields.innerHTML = '<input id="apiurl" type="url" placeholder="https://example.com/api/chat?message=" autocomplete="url"><small>Paste your AI API URL. A URL ending in ?message= (or containing {message}) gets the user\'s text as a GET request. Any other URL gets a JSON POST. No separate API key needed.</small>';
-      else providerFields.innerHTML = '<small>Configure commands and auto-replies after adding the bot.</small>';
+      if (type === "google") setHtml(providerFields, '<input id="apikey" type="password" placeholder="Google AI API key" autocomplete="off"><small>Uses Google Gemini 2.5 Flash. The key is stored locally with this bot.</small>');
+      else if (type === "url") setHtml(providerFields, '<input id="apiurl" type="url" placeholder="https://example.com/api/chat?message=" autocomplete="url"><small>Paste your AI API URL. A URL ending in ?message= (or containing {message}) gets the user\'s text as a GET request. Any other URL gets a JSON POST. No separate API key needed.</small>');
+      else setHtml(providerFields, '<small>Configure commands and auto-replies after adding the bot.</small>');
     }
     app.querySelector("#type").onchange = updateProviderFields;
     updateProviderFields();
@@ -331,7 +352,7 @@
     h += '</div><div class="tgb-row"><button id="addc">+ Command</button><button class="green" id="pub">Save to Telegram</button></div>' +
       '<div class="tgb-err" id="err"></div><h4>Messages</h4><div class="tgb-log" id="log"></div>' +
       '<div id="replybox"></div></div>';
-    app.innerHTML = h;
+    setHtml(app, h);
 
     app.querySelector("#back").onclick = function () { view = { name: "list" }; render(); };
     app.querySelector("#run").onclick = function () { state(b).running ? stop(b) : start(b); };
@@ -384,8 +405,8 @@
     if (!run || !st) return;
     run.textContent = r.running ? "Stop" : "Start";
     run.className = r.running ? "red" : "green";
-    st.innerHTML = '<span class="tgb-dot' + (r.running ? " on" : "") + '"></span>' + (r.running ? "Running" : "Stopped") +
-      (r.err ? '<div class="tgb-err">' + esc(r.err) + "</div>" : "");
+    setHtml(st, '<span class="tgb-dot' + (r.running ? " on" : "") + '"></span>' + (r.running ? "Running" : "Stopped") +
+      (r.err ? '<div class="tgb-err">' + esc(r.err) + "</div>" : ""));
   }
 
   function renderLog() {
@@ -393,11 +414,11 @@
     if (!app) return;
     var r = state(b), el = app.querySelector("#log");
     if (!el) return;
-    if (!r.log.length) { el.innerHTML = "<small>No messages yet. Start the bot and message it.</small>"; return; }
-    el.innerHTML = r.log.map(function (m, i) {
+    if (!r.log.length) { setHtml(el, "<small>No messages yet. Start the bot and message it.</small>"); return; }
+    setHtml(el, r.log.map(function (m, i) {
       return '<div class="' + (m.out ? "o" : "") + '"><b>' + esc(m.who) + "</b>: " + esc(m.text) +
         (m.out ? "" : ' <button class="ghost" data-rep="' + i + '">Reply</button>') + "</div>";
-    }).join("");
+    }).join(""));
     [].forEach.call(el.querySelectorAll("[data-rep]"), function (btn) {
       btn.onclick = function () { replyBox(b, r.log[parseInt(btn.getAttribute("data-rep"), 10)]); };
     });
@@ -405,14 +426,14 @@
 
   function replyBox(b, m) {
     var box = app.querySelector("#replybox");
-    box.innerHTML = '<div class="tgb-card"><small>Reply to ' + esc(m.who) + '</small><textarea id="rt"></textarea>' +
-      '<button id="rs">Send</button></div>';
+    setHtml(box, '<div class="tgb-card"><small>Reply to ' + esc(m.who) + '</small><textarea id="rt"></textarea>' +
+      '<button id="rs">Send</button></div>');
     box.querySelector("#rs").onclick = async function () {
       var t = box.querySelector("#rt").value.trim(); if (!t) return;
       try {
         await api(b.token, "sendMessage", { chat_id: m.chat, text: t });
         state(b).log.unshift({ chat: m.chat, who: "bot", text: t, out: true });
-        box.innerHTML = ""; renderLog();
+        setHtml(box, ""); renderLog();
       } catch (e) { toast(e.message); }
     };
   }
@@ -443,7 +464,7 @@
     });
     if (!bots.length) h += "<p>No bots yet. Add tokens in the plugin settings or tap Open manager.</p>";
     h += '<button id="tgb-open">Open manager</button></div>';
-    sideEl.innerHTML = h;
+    setHtml(sideEl, h);
     sideEl.querySelector("#tgb-open").onclick = function () { setTimeout(open, 80); };
     [].forEach.call(sideEl.querySelectorAll("[data-run]"), function (btn) {
       btn.onclick = function () {
@@ -491,7 +512,7 @@
     console.error("Telegram Bots page error", err);
     if (!sideEl) return;
     sideMode = true;
-    sideEl.innerHTML = "";
+    setHtml(sideEl, "");
     wrap = document.createElement("div");
     wrap.className = "tgb";
     var style = document.createElement("style");
