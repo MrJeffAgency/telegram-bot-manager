@@ -37,4 +37,5 @@ Data handling:
 
 ## Security notes
 - Anyone with a bot token controls that bot. Keep tokens private and revoke them in @BotFather if exposed.
-- Only add AI API URLs you trust, because user messages are sent to them.
+- Only add AI API URLs you trust, because user messages are sent to them. AI API URLs must be HTTPS and you are asked to confirm before one is saved.
+- The interface is built without `innerHTML` (a DOM parser copies escaped content), and all text from Telegram or the AI is escaped before display.
