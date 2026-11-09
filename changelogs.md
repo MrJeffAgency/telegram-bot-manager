@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.1.4
+- Added keywords and contributors to the plugin listing.
+
 ## 1.1.3
 - Security hardening: no more innerHTML (screens are built with a safe DOM parser).
 - AI API URL must be HTTPS and asks for confirmation before messages are forwarded to it.
