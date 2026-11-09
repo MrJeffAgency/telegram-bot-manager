@@ -1,0 +1,18 @@
+{
+  "id": "telegram.bot.manager",
+  "name": "Telegram Bot Manager",
+  "main": "main.js",
+  "version": "1.1.2",
+  "readme": "readme.md",
+  "icon": "icon.png",
+  "files": [],
+  "minVersionCode": 290,
+  "author": {
+    "name": "MrJeffAgency",
+    "github": "MrJeffAgency",
+    "url": "https://github.com/MrJeffAgency/telegram-bot-manager"
+  },
+  "license": "MIT",
+  "changelogs": "changelogs.md",
+  "repository": "https://github.com/MrJeffAgency/telegram-bot-manager"
+}
