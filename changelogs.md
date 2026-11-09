@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.3
+- Security hardening: no more innerHTML (screens are built with a safe DOM parser).
+- AI API URL must be HTTPS and asks for confirmation before messages are forwarded to it.
+
 ## 1.1.2
 - Source code is now open source (MIT license) with a network and privacy section in the readme.
 
